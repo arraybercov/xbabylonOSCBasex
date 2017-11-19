@@ -1,0 +1,201 @@
+<html>
+  <head>
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <title>xbx</title>
+
+  <!-- <script src="https://preview.babylonjs.com/babylon.max.js"></script> -->
+  <script src="js/babylon.max.js"></script>
+  <script src="js/osc-browser.js"></script>
+  <!-- <script src="js/webmidi.js"></script>
+    <script src="js/webmidiSetup.js"></script> -->
+
+  <style>
+    html, body {
+            width: 100%;
+            height: 100%
+            padding: 0;
+            background-color: #000000;
+            margin: 0;
+            overflow: hidden;
+
+    }
+      #renderCanvas {
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="renderCanvas"></canvas>
+
+<script>
+
+"use strict";
+
+var canvas, engine, scene, camera, createScene;
+var object1, scene;
+// var cc1 = 0;
+var bd = "bd";
+var osc1 = 0.25;
+
+var oscPort = new osc.WebSocketPort({
+    url: "ws://localhost:8081",
+    metadata: true
+});
+
+oscPort.open();
+
+function foo(oscMsg) {
+    var data = {};
+    for (var i = 0; i < oscMsg.args.length; i+=2) {
+      var key = oscMsg.args[i].value;
+      var value = oscMsg.args[i+1].value
+      data[key] = value;
+    }
+
+    if (data.speed) {
+      osc1 = data.speed;
+    }
+    console.log(osc1)
+
+    if (data.s == "bd") {
+      bd = data.s;
+    }
+    else {bd = "poop"}
+    console.log(bd)
+}
+
+oscPort.on("message", function (oscMsg) {
+    foo(oscMsg);
+    // console.log(oscMsg);
+});
+
+    window.addEventListener('DOMContentLoaded', function() {
+
+    canvas = document.getElementById("renderCanvas");
+    engine = new BABYLON.Engine(canvas, true);
+
+    createScene = function() {
+        engine.setHardwareScalingLevel(0.5);
+        scene = new BABYLON.Scene( engine );
+        scene.clearColor = new BABYLON.Color3.Black();
+        camera = new BABYLON.ArcRotateCamera("Camera", 0, Math.PI / 1.3, 12, BABYLON.Vector3.Zero(), scene);
+        camera.inertia = 0;
+        camera.angularSensibilityX = 2000;
+
+        camera.attachControl(canvas, true);
+        scene.activeCamera.panningSensibility = 0;
+        // camera.minZ = 1.0;
+        // var light1 = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(1, 1, 0), scene);
+        // var light2 = new BABYLON.PointLight("light2", new BABYLON.Vector3(0, 1, -1), scene);
+
+
+        object1 = BABYLON.MeshBuilder.CreateTorusKnot("tk", {radius:2.1, radialSegments:128}, scene);
+
+        BABYLON.Effect.ShadersStore["customVertexShader"]=                "precision highp float;\r\n"+
+
+        "// Attributes\r\n"+
+        "attribute vec3 position;\r\n"+
+        "attribute vec3 normal;\r\n"+
+        "attribute vec2 uv;\r\n"+
+
+        "// Uniforms\r\n"+
+        "uniform mat4 worldViewProjection;\r\n"+
+
+        "// Varying\r\n"+
+        "varying vec4 vPosition;\r\n"+
+        "varying vec3 vNormal;\r\n"+
+
+        "void main() {\r\n"+
+
+        "    vec4 p = vec4( position, 1. );\r\n"+
+
+        "    vPosition = p;\r\n"+
+        "    vNormal = normal;\r\n"+
+
+        "    gl_Position = worldViewProjection * p;\r\n"+
+
+        "}\r\n";
+
+        BABYLON.Effect.ShadersStore["customFragmentShader"]=                "precision highp float;\r\n"+
+
+        "uniform mat4 worldView;\r\n"+
+
+        "varying vec4 vPosition;\r\n"+
+        "varying vec3 vNormal;\r\n"+
+
+        "uniform sampler2D fleshTexture;\r\n"+
+
+        "void main(void) {\r\n"+
+
+        "    vec3 e = normalize( vec3( worldView * vPosition ) );\r\n"+
+        "    vec3 n = normalize( worldView * vec4(vNormal, 0.0) ).xyz;\r\n"+
+
+        "    vec3 r = reflect( e, n );\r\n"+
+        "    float m = 2. * sqrt(\r\n"+
+        "        pow( r.x, 2. ) +\r\n"+
+        "        pow( r.y, 2. ) +\r\n"+
+        "        pow( r.z + 1., 2. )\r\n"+
+        "    );\r\n"+
+        "    vec2 vN = r.xy / m + .5;\r\n"+
+
+        "    vec3 base = texture2D( fleshTexture, vN).rgb;\r\n"+
+
+        "    gl_FragColor = vec4( base, 1. );\r\n"+
+        "}\r\n";
+
+        var shaderMaterial = new BABYLON.ShaderMaterial("shader", scene, {
+            vertex: "custom",
+            fragment: "custom",
+        },
+            {
+                attributes: ["position", "normal", "uv"],
+                uniforms: ["world", "worldView", "worldViewProjection", "view", "projection"]
+            });
+
+        var fleshTexture = new BABYLON.Texture("/textures/internalFlesh1024Po2.jpg", scene);
+        // fleshTexture.wrapU = BABYLON.Texture.CLAMP_ADDRESSMODE;
+        // fleshTexture.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+
+        // var mainTexture = new BABYLON.Texture("/textures/cloudsPo2.jpg", scene);
+
+
+        shaderMaterial.setTexture("fleshTexture", fleshTexture);
+        object1.material = shaderMaterial;
+        object1.position = new BABYLON.Vector3(0, 0, 0);
+
+        scene.registerBeforeRender(function() {
+
+          if (bd == "bd") {
+            // object1.rotation.y += Math.random() * 0.75;
+            // object1.scaling = new BABYLON.Vector3(1, 1, 1);
+                object1.rotation.x += 0.05;
+          }
+
+          if (bd == "poop"){
+            object1.rotation.x = 0;
+            // object1.scaling = new BABYLON.Vector3(1, 10, 1);
+          }
+        });
+
+        return scene;
+      }
+
+        scene = createScene();
+        engine.runRenderLoop(function() {
+
+
+
+          scene.render();
+        });
+
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+      });
+
+</script>
+</body>
+</html>
